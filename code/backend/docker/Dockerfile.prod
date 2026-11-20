@@ -1,0 +1,24 @@
+# Template §20.2, adapted only for the workspace (`-p falcon-api`) and a pinned
+# Rust 1.99 builder (tag verified on Docker Hub 2026-11-18).
+# Build context: code/backend/
+
+# cargo-chef computes a dependency recipe so the deps layer is cached across source changes.
+FROM lukemathwalker/cargo-chef:latest-rust-1.99-slim-bookworm AS chef
+WORKDIR /app
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY . .
+RUN cargo build --release -p falcon-api --bin api
+
+# ────────────────────────────────────────
+FROM gcr.io/distroless/cc-debian12:nonroot
+COPY --from=builder /app/target/release/api /app
+USER nonroot:nonroot
+EXPOSE 8080
+ENTRYPOINT ["/app"]

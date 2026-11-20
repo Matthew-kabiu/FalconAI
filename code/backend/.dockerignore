@@ -1,0 +1,6 @@
+# Keep the Docker build context small: `COPY . .` must never send build output
+# (target/ is often several GB) or local env files into an image.
+target/
+**/target/
+.env
+.env.*

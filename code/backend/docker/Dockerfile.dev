@@ -1,0 +1,31 @@
+# Template §20.1, adapted only for the three-crate workspace (SOP addendum §4).
+# Build context: code/backend/
+FROM rust:1-slim-bookworm
+
+WORKDIR /app
+# sea-orm-cli links OpenSSL; the slim image lacks its headers and pkg-config.
+# Dev image only — the prod image ships one rustls binary and needs neither.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+ && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-watch sea-orm-cli
+
+# Cache dependencies: build dummy crates first so the deps layer survives source edits.
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY falcon-core/Cargo.toml falcon-core/
+COPY falcon-api/Cargo.toml falcon-api/
+COPY migration/Cargo.toml migration/
+RUN mkdir -p falcon-core/src falcon-api/src migration/src \
+ && echo '' > falcon-core/src/lib.rs \
+ && echo '' > falcon-api/src/lib.rs && echo 'fn main(){}' > falcon-api/src/main.rs \
+ && echo '' > migration/src/lib.rs && echo 'fn main(){}' > migration/src/main.rs \
+ && cargo build && rm -rf falcon-core/src falcon-api/src migration/src
+
+COPY . .
+# COPY keeps the files' original timestamps, which can be older than the dummy
+# build above; cargo would then think the dummy output is current. Touching the
+# crate roots forces a real rebuild of our three crates (deps stay cached).
+RUN touch falcon-core/src/lib.rs falcon-api/src/lib.rs falcon-api/src/main.rs \
+    migration/src/lib.rs migration/src/main.rs
+EXPOSE 8080
+ENTRYPOINT ["sh", "scripts/entrypoint-dev.sh"]
