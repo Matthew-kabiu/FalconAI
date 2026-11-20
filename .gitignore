@@ -25,10 +25,11 @@ Agenthandoff.md
 STACK.md
 .claude/settings.local.json
 
-# Secrets (every env file except the single committed example)
+# Secrets (allow the documented example and the CI-only fixture)
 .env
 .env.*
 !/code/.env.example
+!/code/.env.git
 .envrc
 .aws/
 .netrc
