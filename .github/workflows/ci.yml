@@ -1,0 +1,83 @@
+name: Falcon AI CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Rust lint, type check, tests, and build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: code/backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check formatting and lint
+        run: |
+          cargo fmt --all --check
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Check types
+        run: cargo check --locked --workspace --all-targets
+      - name: Start disposable PostgreSQL
+        working-directory: code
+        run: |
+          cp .env.git .env.development
+          docker compose --env-file .env.development -p falcon-ci -f docker-compose.dev.yml up --wait --wait-timeout 120 postgres
+      - name: Run unit and PostgreSQL integration tests
+        run: |
+          set -a
+          source ../.env.git
+          set +a
+          cargo test --locked --workspace -- --include-ignored
+      - name: Build release binaries
+        run: cargo build --locked --workspace --release
+
+  frontend:
+    name: Web lint, type check, and build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: code/frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: code/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Build the web app
+        run: |
+          set -a
+          source ../.env.git
+          set +a
+          npm run build
+
+  compose:
+    name: Validate Docker Compose environments
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: code
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate development, staging, and production
+        run: |
+          cp .env.git .env.development
+          cp .env.git .env.staging
+          cp .env.git .env.production
+          make config-check
