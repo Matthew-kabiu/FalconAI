@@ -1,0 +1,66 @@
+# >>> stride (auto-managed, do not edit) >>>
+.claude/commands/linear/
+.claude/hooks/check_commit_widths.py
+.claude/hooks/do_commit.sh
+.claude/hooks/pretooluse/block_bare_git_commit.py
+.claude/hooks/pretooluse/block_bare_git_commit.sh
+.claude/hooks/userpromptsubmit/inject_design_principles.sh
+.claude/skills/clear-speak/
+.claude/skills/commit/
+.claude/skills/craft/
+.claude/skills/parallel-sessions/
+.claude/skills/vision-evolve/
+.claude/skills/vision/
+.claude/stride/docs/concepts/
+.claude/stride/docs/patterns/git/
+.claude/stride/docs/principles/
+.claude/tools/
+.claude/worktrees/
+# <<< stride <<<
+
+# Agent working docs (copied from Obsidian templates; never pushed)
+SOP.md
+Changelog.md
+Agenthandoff.md
+STACK.md
+.claude/settings.local.json
+
+# Secrets (every env file except the single committed example)
+.env
+.env.*
+!/code/.env.example
+.envrc
+.aws/
+.netrc
+.npmrc.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies, build output, and generated artifacts
+node_modules/
+target/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+*.log
+/code/frontend/.shots/
+
+# Backups
+*.bak
+*.dump
+*.sql.gz
+backups/
+
+# Local editor and operating system files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Private project documents
+docs/private/
+
