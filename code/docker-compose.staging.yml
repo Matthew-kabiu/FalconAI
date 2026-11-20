@@ -1,0 +1,88 @@
+# Falcon AI — STAGING stack.
+# Shape: Rust-Backend-Build-Template §20.2/§20.3 + Backend-Build-Template §9.5 + Vite-Build-Template §11.4.
+# Mirrors docker-compose.prod.yml verbatim; the ONLY difference is the env file
+# (.env.staging here, .env.production there). `make mirror-check` fails if they drift.
+# Run from code/:  make staging-up
+services:
+  api:
+    container_name: falcon_api_${APP_ENV:?set in the env file}
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.prod
+    ports:
+      - "${API_PORT:?set in the env file}:${PORT:?set in the env file}"
+    env_file:
+      - .env.staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - falcon_network
+    deploy:
+      resources:
+        limits:       { cpus: '1',    memory: 256M }
+        reservations: { cpus: '0.25', memory: 64M }
+    healthcheck:
+      test: ["CMD", "/app", "--health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    container_name: falcon_frontend_${APP_ENV:?set in the env file}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?set in the env file}
+        VITE_APP_NAME: ${VITE_APP_NAME:?set in the env file}
+        VITE_ENVIRONMENT: ${VITE_ENVIRONMENT:?set in the env file}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:?set in the env file}
+    ports:
+      - "${FRONTEND_PORT:?set in the env file}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - falcon_network
+    deploy:
+      resources:
+        limits:       { cpus: '0.5',  memory: 256M }
+        reservations: { cpus: '0.25', memory: 128M }
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  postgres:
+    container_name: falcon_postgres_${APP_ENV:?set in the env file}
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set in the env file}
+      POSTGRES_USER: ${POSTGRES_USER:?set in the env file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in the env file}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - falcon_network
+    deploy:
+      resources:
+        limits:       { cpus: '2',    memory: 2G }
+        reservations: { cpus: '0.5',  memory: 512M }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Volume and network names are prefixed by the compose project name
+# (falcon-production / falcon-staging), so the two environments never share data.
+volumes:
+  postgres_data:
+
+networks:
+  falcon_network:
+    driver: bridge

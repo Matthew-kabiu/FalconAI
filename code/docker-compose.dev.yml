@@ -1,0 +1,74 @@
+# Falcon AI — development stack.
+# Shape: Backend-Build-Template §9.4 + Rust-Backend-Build-Template §20.1/§20.3 + Vite-Build-Template §11.4.
+# Run from code/:  make dev-up   (= docker compose --env-file .env.development -f docker-compose.dev.yml up --build)
+# Ports and credentials come ONLY from .env.development (Vite template Rule 7).
+
+services:
+  api:
+    container_name: falcon_api_dev
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.dev
+    ports:
+      - "${API_PORT:?set in .env.development}:${PORT:?set in .env.development}"
+    volumes:
+      - ./backend:/app:rw
+      - cargo_target_dev:/app/target
+      - cargo_registry_dev:/usr/local/cargo/registry
+    env_file:
+      - .env.development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - falcon_network_dev
+
+  frontend:
+    container_name: falcon_frontend_dev
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+      args:
+        VITE_DEV_PORT: ${VITE_DEV_PORT:?set in .env.development}
+    ports:
+      - "${FRONTEND_PORT:?set in .env.development}:${VITE_DEV_PORT}"
+    volumes:
+      - ./frontend/src:/app/src:rw
+      - ./frontend/public:/app/public:ro
+      - ./frontend/index.html:/app/index.html:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - /app/node_modules
+    env_file:
+      - .env.development
+    depends_on:
+      - api
+    networks:
+      - falcon_network_dev
+
+  postgres:
+    container_name: falcon_postgres_dev
+    image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:?set in .env.development}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env.development}
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env.development}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.development}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - falcon_network_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data_dev:
+  cargo_target_dev:
+  cargo_registry_dev:
+
+networks:
+  falcon_network_dev:
+    driver: bridge
