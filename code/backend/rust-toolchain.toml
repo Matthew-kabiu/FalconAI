@@ -1,0 +1,6 @@
+# Pins the compiler like `.nvmrc` pins Node. rustup reads this file and
+# installs/uses exactly this toolchain inside code/backend/.
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -1,0 +1,23 @@
+[package]
+name = "falcon-core"
+version = "0.1.0"
+description = "Falcon AI domain rules: pure, synchronous, no I/O"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# SOP addendum, "The core / API boundary": this crate may depend ONLY on
+# serde, uuid, chrono and thiserror, because it must later compile into the
+# Android, iOS and WebAssembly apps. Never add tokio, axum, sea-orm, reqwest or
+# anything that does I/O. Add serde/uuid/chrono here only when a type needs them.
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+# Dates for crop cycles, activities and the crop calendar (`NaiveDate`: a
+# calendar date with no time zone). Already the workspace's one time crate and
+# allowed by the boundary rule. Core never reads the clock: "today" is always
+# passed in by the caller.
+chrono.workspace = true
+
+[lints]
+workspace = true

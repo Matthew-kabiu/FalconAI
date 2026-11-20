@@ -1,0 +1,4 @@
+# Template §8.2 / §23: unwrap()/expect() are denied in src/ (see [workspace.lints]
+# in Cargo.toml) but permitted in tests, where a panic is the failure report.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

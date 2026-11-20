@@ -1,0 +1,60 @@
+# Falcon AI backend — Cargo workspace (think: an npm/pnpm workspace root).
+#
+# Three members, split per the SOP addendum "The core / API boundary":
+#   falcon-core  pure domain rules; must also build for Android, iOS and WebAssembly
+#   falcon-api   the Axum HTTP service (binary `api`)
+#   migration    SeaORM migrations (crate layout SeaORM's CLI expects)
+#
+# This root manifest is "virtual": it has no [package] of its own, only shared
+# settings. Members opt in with `x.workspace = true`.
+[workspace]
+resolver = "3"
+members = ["falcon-core", "falcon-api", "migration"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+# One place for versions, like a root package.json "overrides" block.
+# Versions are the current stable on crates.io, checked 2026-11-18 (template §22).
+# A caret range is implied ("0.8.9" means ">=0.8.9, <0.9"); Cargo.lock freezes it.
+[workspace.dependencies]
+falcon-core = { path = "falcon-core" }
+migration = { path = "migration" }
+
+tokio = { version = "1.54.1", features = ["full"] }
+axum = "0.8.9"
+tower = "0.5.3"
+tower-http = { version = "0.7.1", features = ["trace", "cors", "timeout", "request-id", "set-header", "catch-panic"] }
+serde = { version = "1.0.229", features = ["derive"] }
+validator = { version = "0.21.0", features = ["derive"] }
+# default-features off: SeaORM's defaults also pull `time`, `rust_decimal` and others.
+# The SOP addendum picks `chrono` as the one time crate.
+sea-orm = { version = "2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-json", "with-chrono", "with-uuid"] }
+sea-orm-migration = { version = "2.0.4", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+envy = "0.4.2"
+dotenvy = "0.15.7"
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+secrecy = { version = "0.10.3", features = ["serde"] }
+
+serde_json = "1.0.154"
+
+# Clerk session-token verification. Versions checked on crates.io 2026-11-18.
+# jsonwebtoken: default-features off drops PEM parsing (keys arrive from Clerk's
+# JWKS as RSA components, not PEM; tests re-enable `use_pem` as a dev-dependency).
+# `rust_crypto` is the pure-Rust crypto backend (RS256 via the `rsa` crate).
+jsonwebtoken = { version = "12.0.0", default-features = false, features = ["rust_crypto"] }
+# reqwest: default-features off (template §22). reqwest 0.13 renamed the
+# template's `rustls-tls` feature to `rustls`; it is the same rustls backend.
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
+
+# Template §23: `unwrap_used` and `expect_used` denied in src/.
+# clippy.toml allows them inside #[test] code only.
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

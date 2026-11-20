@@ -1,0 +1,48 @@
+[package]
+name = "falcon-api"
+version = "0.1.0"
+description = "Falcon AI HTTP API (Axum + SeaORM + Postgres)"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# The library (src/lib.rs) holds everything so tests can import it;
+# the binary (src/main.rs) only wires it together. Binary name per template §20.2.
+[lib]
+name = "falcon_api"
+path = "src/lib.rs"
+
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
+[dependencies]
+falcon-core.workspace = true
+migration.workspace = true
+
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+validator.workspace = true
+sea-orm.workspace = true
+envy.workspace = true
+dotenvy.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono.workspace = true
+secrecy.workspace = true
+serde_json.workspace = true
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+# Tests sign tokens with an RSA key embedded as PEM, so they need PEM parsing.
+# Dev-dependency features apply to test builds only, not to the shipped binary.
+jsonwebtoken = { workspace = true, features = ["use_pem"] }
+
+[lints]
+workspace = true
