@@ -1,0 +1,60 @@
+// Kenya's 47 counties. The slug is what the API stores (api/openapi.yaml → County);
+// the name is shown to farmers. County names are proper nouns, written the same in
+// English and Kiswahili, so they live here rather than in the dictionaries.
+export const COUNTIES = [
+  { value: 'baringo', label: 'Baringo' },
+  { value: 'bomet', label: 'Bomet' },
+  { value: 'bungoma', label: 'Bungoma' },
+  { value: 'busia', label: 'Busia' },
+  { value: 'elgeyo-marakwet', label: 'Elgeyo-Marakwet' },
+  { value: 'embu', label: 'Embu' },
+  { value: 'garissa', label: 'Garissa' },
+  { value: 'homa-bay', label: 'Homa Bay' },
+  { value: 'isiolo', label: 'Isiolo' },
+  { value: 'kajiado', label: 'Kajiado' },
+  { value: 'kakamega', label: 'Kakamega' },
+  { value: 'kericho', label: 'Kericho' },
+  { value: 'kiambu', label: 'Kiambu' },
+  { value: 'kilifi', label: 'Kilifi' },
+  { value: 'kirinyaga', label: 'Kirinyaga' },
+  { value: 'kisii', label: 'Kisii' },
+  { value: 'kisumu', label: 'Kisumu' },
+  { value: 'kitui', label: 'Kitui' },
+  { value: 'kwale', label: 'Kwale' },
+  { value: 'laikipia', label: 'Laikipia' },
+  { value: 'lamu', label: 'Lamu' },
+  { value: 'machakos', label: 'Machakos' },
+  { value: 'makueni', label: 'Makueni' },
+  { value: 'mandera', label: 'Mandera' },
+  { value: 'marsabit', label: 'Marsabit' },
+  { value: 'meru', label: 'Meru' },
+  { value: 'migori', label: 'Migori' },
+  { value: 'mombasa', label: 'Mombasa' },
+  { value: 'muranga', label: "Murang'a" },
+  { value: 'nairobi', label: 'Nairobi' },
+  { value: 'nakuru', label: 'Nakuru' },
+  { value: 'nandi', label: 'Nandi' },
+  { value: 'narok', label: 'Narok' },
+  { value: 'nyamira', label: 'Nyamira' },
+  { value: 'nyandarua', label: 'Nyandarua' },
+  { value: 'nyeri', label: 'Nyeri' },
+  { value: 'samburu', label: 'Samburu' },
+  { value: 'siaya', label: 'Siaya' },
+  { value: 'taita-taveta', label: 'Taita-Taveta' },
+  { value: 'tana-river', label: 'Tana River' },
+  { value: 'tharaka-nithi', label: 'Tharaka-Nithi' },
+  { value: 'trans-nzoia', label: 'Trans Nzoia' },
+  { value: 'turkana', label: 'Turkana' },
+  { value: 'uasin-gishu', label: 'Uasin Gishu' },
+  { value: 'vihiga', label: 'Vihiga' },
+  { value: 'wajir', label: 'Wajir' },
+  { value: 'west-pokot', label: 'West Pokot' },
+] as const;
+
+export type County = (typeof COUNTIES)[number]['value'];
+
+const NAMES = new Map<string, string>(COUNTIES.map((county) => [county.value, county.label]));
+
+export const countyName = (slug: string): string => NAMES.get(slug) ?? slug;
+
+export const isCounty = (value: string): value is County => NAMES.has(value);

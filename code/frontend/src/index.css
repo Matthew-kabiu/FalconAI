@@ -1,0 +1,309 @@
+@import 'tailwindcss';
+/*
+ ---break---
+ */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens.
+ * Brand palette (Matt, 2026-11-18): coolors.co/palette/004b23-006400-007200-008000-38b000-70e000-9ef01a-ccff33
+ * DESIGN.md (separate task) documents how each swatch is used; neutrals and the
+ * danger red are not part of the brand palette. Sizes use rem/em/%/vw/vh/dvh/clamp,
+ * never fixed px.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Brand palette — darkest to lightest */
+  --green-950: #004b23;
+  --green-900: #006400;
+  --green-800: #007200;
+  --green-700: #008000;
+  --green-500: #38b000;
+  --green-400: #70e000;
+  --green-300: #9ef01a;
+  --green-200: #ccff33;
+
+  --bg: #f5f8f2;
+  --fg: #12210f;
+  --muted: #4f5c4b;
+  --surface: #ffffff;
+  --surface-hover: #eef4e6;
+  --border: #d3dccb;
+  --primary: var(--green-800);
+  --primary-hover: var(--green-900);
+  --on-primary: #ffffff;
+  --danger: #b3261e;
+  --danger-hover: #95201a;
+  --on-danger: #ffffff;
+  --success: var(--green-700);
+  --focus: var(--green-950);
+  /* Illustration-only fills (DESIGN.md: green-500 is decorative, never text). */
+  --leaf: var(--green-500);
+  --leaf-soft: #dcefc6;
+  /* Call-to-action band: the same deep green in both themes, with a lime action. */
+  --brand-deep: var(--green-950);
+  --on-brand-deep: #f2f9ec;
+  --brand-accent: var(--green-300);
+  --brand-accent-hover: var(--green-200);
+  --on-brand-accent: var(--green-950);
+
+  /* Font family (Matt, 2026-11-18): Outfit, self-hosted via @fontsource-variable/outfit. */
+  --app-font: 'Outfit Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --chart-1: oklch(0.585 0.233 277.117);
+  --chart-2: oklch(0.852 0.199 91.936);
+  --chart-3: oklch(0.459 0.156 302.679);
+  --chart-4: oklch(0.56 0.021 213.5);
+  --chart-5: oklch(0 0 0);
+  --chart-positive: oklch(0.696 0.17 162.48);
+  --chart-negative: oklch(0.637 0.237 25.331);
+  --chart-background: oklch(1 0 0);
+  --chart-foreground: oklch(0.145 0.004 285);
+  --chart-foreground-muted: oklch(0.55 0.014 260);
+  --chart-line-primary: var(--chart-1);
+  --chart-line-secondary: var(--chart-2);
+  --chart-crosshair: oklch(0.4 0.1828 274.34);
+  --chart-grid: oklch(0.9 0 0);
+  --chart-brush-border: var(--chart-grid);
+  --chart-tooltip-background: var(--popover);
+  --chart-tooltip-foreground: var(--popover-foreground);
+  --chart-tooltip-muted: var(--muted-foreground);
+  --chart-marker-background: oklch(0.97 0.005 260);
+  --chart-marker-border: oklch(0.85 0.01 260);
+  --chart-marker-foreground: oklch(0.3 0.01 260);
+  --chart-label: oklch(0.45 0.01 260);
+  --chart-scale-mix: oklch(1 0 0);
+  --chart-scale-01: oklch(0.922 0 0);
+  --chart-scale-02: color-mix(in oklab, var(--chart-1) 35%, var(--chart-scale-mix));
+  --chart-scale-03: color-mix(in oklab, var(--chart-1) 55%, var(--chart-scale-mix));
+  --chart-scale-04: color-mix(in oklab, var(--chart-1) 78%, var(--chart-scale-mix));
+  --chart-scale-05: var(--chart-1);
+  --chart-scale-pattern-color: oklch(1 0 0);
+  --chart-indicator-color: oklch(0.21 0.006 285);
+  --chart-indicator-secondary-color: oklch(0.913 0 0);
+  --chart-marker-badge-background: oklch(0 0 0);
+  --chart-marker-badge-foreground: oklch(0.84 0 0);
+  --chart-segment-background: oklch(0.756 0 0 / 0.06);
+  --chart-segment-line: oklch(0.5 0 0 / 0.25);
+}
+
+/*
+ * Themes: System (default), Light, Dark. The choice is stored per device and set as
+ * data-theme on <html> before first paint (inline script in index.html). No attribute
+ * means System: follow the OS. The dark values appear twice (once for the OS setting,
+ * once for an explicit choice); keep the two blocks identical.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0d1a0f;
+    --fg: #e9f2e4;
+    --muted: #a5b3a0;
+    --surface: #142416;
+    --surface-hover: #1c311e;
+    --border: #2e452f;
+    --primary: var(--green-400);
+    --primary-hover: var(--green-300);
+    --on-primary: var(--green-950);
+    --danger: #f2b8b5;
+    --danger-hover: #f5cac7;
+    --on-danger: #3a0907;
+    --success: var(--green-400);
+    --focus: var(--green-200);
+    --leaf-soft: #23401f;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0d1a0f;
+  --fg: #e9f2e4;
+  --muted: #a5b3a0;
+  --surface: #142416;
+  --surface-hover: #1c311e;
+  --border: #2e452f;
+  --primary: var(--green-400);
+  --primary-hover: var(--green-300);
+  --on-primary: var(--green-950);
+  --danger: #f2b8b5;
+  --danger-hover: #f5cac7;
+  --on-danger: #3a0907;
+  --success: var(--green-400);
+  --focus: var(--green-200);
+  --leaf-soft: #23401f;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* Expose tokens as Tailwind utilities: bg-bg, text-fg, text-muted, border-border … */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-on-danger: var(--on-danger);
+  --color-success: var(--success);
+  --color-focus: var(--focus);
+  --color-leaf: var(--leaf);
+  --color-leaf-soft: var(--leaf-soft);
+  --color-brand-deep: var(--brand-deep);
+  --color-on-brand-deep: var(--on-brand-deep);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-hover: var(--brand-accent-hover);
+  --color-on-brand-accent: var(--on-brand-accent);
+  --font-sans: var(--app-font);
+  --color-chart-line-primary: var(--chart-line-primary);
+  --color-chart-line-secondary: var(--chart-line-secondary);
+  --color-chart-brush-border: var(--chart-brush-border);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --color-chart-tooltip-muted: var(--chart-tooltip-muted);
+  --color-chart-scale-02: var(--chart-scale-02);
+  --color-chart-scale-03: var(--chart-scale-03);
+  --color-chart-scale-04: var(--chart-scale-04);
+  --color-chart-scale-05: var(--chart-scale-05);
+  --color-chart-segment-line: var(--chart-segment-line);
+  --color-chart-segment-background: var(--chart-segment-background);
+  --color-chart-marker-badge-foreground: var(--chart-marker-badge-foreground);
+  --color-chart-marker-badge-background: var(--chart-marker-badge-background);
+  --color-chart-indicator-secondary-color: var(--chart-indicator-secondary-color);
+  --color-chart-indicator-color: var(--chart-indicator-color);
+  --color-chart-scale-pattern-color: var(--chart-scale-pattern-color);
+  --chart-scale-05: var(--chart-scale-05);
+  --chart-scale-04: var(--chart-scale-04);
+  --chart-scale-03: var(--chart-scale-03);
+  --chart-scale-02: var(--chart-scale-02);
+  --color-chart-scale-01: var(--chart-scale-01);
+  --color-chart-scale-mix: var(--chart-scale-mix);
+  --color-chart-label: var(--chart-label);
+  --color-chart-marker-foreground: var(--chart-marker-foreground);
+  --color-chart-marker-border: var(--chart-marker-border);
+  --color-chart-marker-background: var(--chart-marker-background);
+  --chart-tooltip-muted: var(--chart-tooltip-muted);
+  --chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --chart-tooltip-background: var(--chart-tooltip-background);
+  --chart-brush-border: var(--chart-brush-border);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-crosshair: var(--chart-crosshair);
+  --chart-line-secondary: var(--chart-line-secondary);
+  --chart-line-primary: var(--chart-line-primary);
+  --color-chart-foreground-muted: var(--chart-foreground-muted);
+  --color-chart-foreground: var(--chart-foreground);
+  --color-chart-background: var(--chart-background);
+  --color-chart-negative: var(--chart-negative);
+  --color-chart-positive: var(--chart-positive);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+}
+
+/* Resets */
+html {
+  font-family: var(--app-font);
+  font-size: clamp(100%, 0.95rem + 0.25vw, 112.5%);
+  -webkit-text-size-adjust: 100%;
+  /* Keep anchored sections and focused fields clear of the sticky header. */
+  scroll-padding-top: 5.5rem;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+a,
+button,
+[role='button'],
+summary,
+label[for] {
+  cursor: pointer;
+}
+
+:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Public site: sections ease in as they scroll into view. Browsers without
+   scroll-driven animations, and reduced-motion users, simply see the content. */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .reveal {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+}
+/*
+ ---break---
+ */
+.dark {
+  --chart-1: oklch(0.585 0.233 277.117);
+  --chart-2: oklch(0.852 0.199 91.936);
+  --chart-3: oklch(0.459 0.156 302.679);
+  --chart-4: oklch(0.56 0.021 213.5);
+  --chart-5: oklch(1 0 0);
+  --chart-positive: oklch(0.765 0.177 163.223);
+  --chart-negative: oklch(0.704 0.191 22.216);
+  --chart-background: oklch(0.145 0 0);
+  --chart-foreground: oklch(0.45 0 0);
+  --chart-foreground-muted: oklch(0.65 0.01 260);
+  --chart-crosshair: oklch(0.45 0 0);
+  --chart-grid: oklch(0.25 0 0);
+  --chart-brush-border: var(--chart-grid);
+  --chart-marker-background: oklch(0.25 0.01 260);
+  --chart-marker-border: oklch(0.4 0.01 260);
+  --chart-marker-foreground: oklch(0.9 0 0);
+  --chart-label: oklch(0.75 0.01 260);
+  --chart-scale-mix: oklch(0.25 0 0);
+  --chart-scale-01: oklch(0.3 0 0);
+  --chart-scale-02: color-mix(in oklab, var(--chart-1) 35%, var(--chart-scale-mix));
+  --chart-scale-03: color-mix(in oklab, var(--chart-1) 55%, var(--chart-scale-mix));
+  --chart-scale-04: color-mix(in oklab, var(--chart-1) 78%, var(--chart-scale-mix));
+  --chart-scale-05: var(--chart-1);
+  --chart-scale-pattern-color: oklch(0.145 0 0);
+  --chart-indicator-color: oklch(1 0 0);
+  --chart-indicator-secondary-color: oklch(0.145 0 0);
+  --chart-marker-badge-background: oklch(1 0 0);
+  --chart-marker-badge-foreground: oklch(0.15 0 0);
+  --chart-segment-background: oklch(0.41 0.0127 248.14 / 0.25);
+  --chart-segment-line: oklch(1 0 0 / 0.25);
+}
