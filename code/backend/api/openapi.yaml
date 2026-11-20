@@ -1,0 +1,1281 @@
+openapi: 3.1.0
+info:
+  title: Falcon AI API
+  version: 0.1.0
+  description: |
+    The single API contract for the Falcon AI web app now and the mobile apps later
+    (SOP addendum §11). Update with every endpoint. Versioned routes live under
+    /api/v1; /api/health is unversioned.
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      summary: Service and database health
+      description: "Pings the database. Used by Docker, Coolify and the load balancer."
+      tags: [health]
+      responses:
+        "200":
+          description: Service and database are healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
+              example:
+                success: true
+                message: Service healthy
+                data: { status: ok, database: ok }
+        "503":
+          description: The database did not answer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
+              example:
+                success: false
+                message: Database unavailable
+                data: { status: degraded, database: down }
+  /api/v1/me:
+    get:
+      operationId: getMe
+      summary: The signed-in user
+      description: |
+        Returns the Clerk user id and role of the bearer token's owner. The role comes
+        from Clerk `public_metadata.role`: exactly `admin` is admin, anything else member.
+      tags: [account]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The token is valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeEnvelope"
+              example:
+                success: true
+                message: Signed in
+                data: { userId: user_2abcDEF, role: member }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/admin/ping:
+    get:
+      operationId: getAdminPing
+      summary: Admin role check
+      description: "Succeeds only for admins. Lets clients and tests confirm role enforcement."
+      tags: [admin]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller is an admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPingEnvelope"
+              example:
+                success: true
+                message: Admin access confirmed
+                data: { ok: true }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/farms:
+    get:
+      operationId: listFarms
+      summary: The signed-in farmer's farms
+      description: "Only the caller's own farms, sorted by name (then id), 20 per page by default."
+      tags: [farms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: One page of farms.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmListEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createFarm
+      summary: Add a farm
+      tags: [farms]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FarmInput"
+            example: { name: Home farm, county: kiambu, locality: Gatundu }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+  /api/v1/farms/{farmId}:
+    parameters:
+      - $ref: "#/components/parameters/FarmId"
+    get:
+      operationId: getFarm
+      summary: One farm with its plots
+      description: "404 if the farm does not exist OR belongs to someone else (never 403, so ids cannot be probed)."
+      tags: [farms]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The farm and all its plots, sorted by name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmDetailEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateFarm
+      summary: Edit a farm
+      description: "Send only the fields to change. Send `locality` as null to clear it."
+      tags: [farms]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FarmPatch"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+    delete:
+      operationId: deleteFarm
+      summary: Delete a farm
+      description: "Refused with 409 while the farm still has plots (remove the plots first)."
+      tags: [farms]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The farm still has plots.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                success: false
+                error: FARM_HAS_PLOTS
+                message: Remove this farm's plots before deleting it.
+                statusCode: 409
+                timestamp: "2026-11-19T10:00:00+00:00"
+  /api/v1/farms/{farmId}/plots:
+    parameters:
+      - $ref: "#/components/parameters/FarmId"
+    post:
+      operationId: createPlot
+      summary: Add a plot to a farm
+      tags: [plots]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlotInput"
+            example: { name: Plot A, size: 0.5, sizeUnit: acres }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlotEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+  /api/v1/plots/{plotId}:
+    parameters:
+      - $ref: "#/components/parameters/PlotId"
+    patch:
+      operationId: updatePlot
+      summary: Edit a plot
+      description: "Send only the fields to change. Send `notes` as null to clear them."
+      tags: [plots]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlotPatch"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlotEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+    delete:
+      operationId: deletePlot
+      summary: Delete a plot
+      description: "Refused with 409 while the plot has crop cycles (its season history)."
+      tags: [plots]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The plot has crop cycles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                success: false
+                error: PLOT_HAS_CROPS
+                message: This plot has crop records, so it cannot be deleted.
+                statusCode: 409
+                timestamp: "2026-11-19T10:00:00+00:00"
+  /api/v1/crops:
+    get:
+      operationId: listCrops
+      summary: The crop catalogue
+      description: "Every crop a farmer can choose, from falcon-core. `hasCalendar` is true only when that crop's growth stages come from a published reference. Names are translated by the client from the slug."
+      tags: [crops]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CropListEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/crop-cycles:
+    get:
+      operationId: listCropCycles
+      summary: All my crop cycles
+      description: "Across all my plots, newest planting first (then id). `status=open` means planned or active; `closed` means harvested or abandoned; leave it out for all."
+      tags: [crop-cycles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CycleStatusFilter"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CropCycleListEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/plots/{plotId}/crop-cycles:
+    parameters:
+      - $ref: "#/components/parameters/PlotId"
+    get:
+      operationId: listPlotCropCycles
+      summary: A plot's crop cycles
+      description: "Newest planting first. 404 if the plot is not mine."
+      tags: [crop-cycles]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CropCycleArrayEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: startCropCycle
+      summary: Start a crop on a plot
+      description: "Status is `planned` when plantedOn is after today (Africa/Nairobi), otherwise `active`. Refused with 409 OPEN_CYCLE_EXISTS while the plot has a planned or active cycle."
+      tags: [crop-cycles]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CropCycleInput"
+      responses:
+        "201":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CropCycleEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+        "409":
+          description: The plot already has an open (planned or active) crop cycle.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /api/v1/crop-cycles/{cycleId}:
+    parameters:
+      - $ref: "#/components/parameters/CycleId"
+    get:
+      operationId: getCropCycle
+      summary: One crop cycle with its calendar and season cost
+      description: "Includes the plot and farm names, the season cost (sum of its activities' costs) and `calendar` (null when the crop has no sourced calendar or is an `other` crop)."
+      tags: [crop-cycles]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CropCycleDetailEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateCropCycle
+      summary: Edit a crop cycle or move its status forward
+      description: "Send only what changes. `variety: null` clears it. Status may only move forward."
+      tags: [crop-cycles]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CropCyclePatch"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CropCycleEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+        "409":
+          description: The status change goes backwards (only planned → active → harvested or abandoned is allowed).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /api/v1/crop-cycles/{cycleId}/activities:
+    parameters:
+      - $ref: "#/components/parameters/CycleId"
+    get:
+      operationId: listActivities
+      summary: A crop cycle's activities and season total
+      description: "Newest first (doneOn, then createdAt). `meta.totalCostKes` is the season total; `meta.total` the count."
+      tags: [activities]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityListEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: addActivity
+      summary: Log an activity
+      description: "doneOn may not be in the future nor more than 60 days before the cycle's planting date."
+      tags: [activities]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityInput"
+      responses:
+        "201":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+  /api/v1/activities/{activityId}:
+    parameters:
+      - $ref: "#/components/parameters/ActivityId"
+    patch:
+      operationId: updateActivity
+      summary: Edit an activity
+      description: "Send only what changes; `null` clears an optional field."
+      tags: [activities]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityPatch"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/RuleBroken"
+    delete:
+      operationId: deleteActivity
+      summary: Delete an activity
+      tags: [activities]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/calendar:
+    get:
+      operationId: getFarmCalendar
+      summary: "One calendar for the whole farm"
+      description: "Every open crop (planned or growing) on every one of my plots, merged into one dated list - each crop's growth stages and timed tasks from its sourced table, activities already logged on those crops, and my own calendar events (any crop or none, open or closed) in the window. Sorted by start date, then kind (stage, task, activity, event), then event time (untimed last), then crop (none first), then key. Default window - 14 days ago to 60 days ahead (Kenya date); at most 180 days."
+      tags: [calendar]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmCalendarEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/events:
+    post:
+      operationId: createEvent
+      summary: "Put my own event on the farm calendar"
+      tags: [calendar]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: "The linked crop cycle is not mine or does not exist." }
+        "422": { $ref: "#/components/responses/RuleBroken" }
+  /api/v1/events/{eventId}:
+    parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEvent
+      summary: "One of my events"
+      tags: [calendar]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateEvent
+      summary: "Change one of my events"
+      description: "Only the fields sent change. Send null for description, time, cycleId or notes to clear them."
+      tags: [calendar]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventPatch" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/RuleBroken" }
+    delete:
+      operationId: deleteEvent
+      summary: "Remove one of my events"
+      tags: [calendar]
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        A Clerk session token (short-lived RS256 JWT) from the Clerk SDK, sent as
+        `Authorization: Bearer <token>`. The API verifies it against Clerk's JWKS:
+        `iss` must equal CLERK_ISSUER, `exp`/`nbf` are checked with 5 s leeway, and
+        `azp`, when present, must be one of CORS_ORIGINS.
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: perPage
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    FarmId:
+      name: farmId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PlotId:
+      name: plotId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CycleId:
+      name: cycleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ActivityId:
+      name: activityId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CycleStatusFilter:
+      name: status
+      in: query
+      schema: { type: string, enum: [open, closed] }
+  responses:
+    BadRequest:
+      description: "The body is not valid JSON, a field has the wrong type or is missing, or a query parameter (page, perPage) is out of range or not a number."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: "Does not exist, or belongs to another farmer. The same answer for both."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RuleBroken:
+      description: |
+        A falcon-core rule failed. `errors` lists every failing field with a stable
+        code; clients translate the code, never show `message` to farmers.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error: VALIDATION_ERROR
+            message: "name: too_long"
+            statusCode: 422
+            timestamp: "2026-11-19T10:00:00+00:00"
+            errors:
+              - { field: name, code: too_long }
+    Unauthorized:
+      description: "Missing, malformed, expired or otherwise invalid token. The message is always generic."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error: UNAUTHORIZED
+            message: unauthorized
+            statusCode: 401
+            timestamp: "2026-11-18T10:00:00+00:00"
+            path: /api/v1/me
+            requestId: 3f0c2a8e-5a8e-4a49-9b8e-2f7b6b1d9c11
+    Forbidden:
+      description: "Valid token, but the user lacks the required role."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error: FORBIDDEN
+            message: forbidden
+            statusCode: 403
+            timestamp: "2026-11-18T10:00:00+00:00"
+            path: /api/v1/admin/ping
+            requestId: 3f0c2a8e-5a8e-4a49-9b8e-2f7b6b1d9c11
+    Unavailable:
+      description: "Clerk's signing keys could not be fetched, so no token can be checked right now."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error: SERVICE_UNAVAILABLE
+            message: Service temporarily unavailable
+            statusCode: 503
+            timestamp: "2026-11-18T10:00:00+00:00"
+            path: /api/v1/me
+            requestId: 3f0c2a8e-5a8e-4a49-9b8e-2f7b6b1d9c11
+  schemas:
+    SuccessEnvelope:
+      type: object
+      description: "Standard success envelope (backend template §5.4). `data` is endpoint-specific."
+      required: [success, message, data]
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: {}
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+    ErrorEnvelope:
+      type: object
+      description: "Standard error envelope. Never contains a stack trace or internal message."
+      required: [success, error, message, statusCode, timestamp]
+      properties:
+        success: { type: boolean, const: false }
+        error:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - CONFLICT
+            - FARM_HAS_PLOTS
+            - PLOT_HAS_CROPS
+            - OPEN_CYCLE_EXISTS
+            - STATUS_BACKWARDS
+            - RATE_LIMIT_EXCEEDED
+            - SERVICE_UNAVAILABLE
+            - INTERNAL_ERROR
+        message: { type: string }
+        statusCode: { type: integer }
+        timestamp: { type: string, format: date-time }
+        path: { type: string }
+        requestId: { type: string }
+        errors:
+          type: array
+          description: Present only on 422. One entry per failing field.
+          items:
+            $ref: "#/components/schemas/FieldIssue"
+    FieldIssue:
+      type: object
+      required: [field, code]
+      properties:
+        field: { type: string, description: The request field, as the client named it. }
+        code:
+          type: string
+          description: |
+            Stable machine code. `required` (empty after trimming), `too_long`,
+            `out_of_range` (a number outside its allowed range), `invalid_choice`
+            (not one of the allowed values), `not_allowed` (a value given where it must
+            not be, e.g. customCrop on a catalogue crop, or quantity without a unit).
+          enum: [required, too_long, out_of_range, invalid_choice, not_allowed]
+    PageMeta:
+      type: object
+      required: [page, perPage, total]
+      properties:
+        page: { type: integer }
+        perPage: { type: integer }
+        total: { type: integer, description: Total items across all pages. }
+    County:
+      type: string
+      description: "One of Kenya's 47 counties, as a lowercase slug. Display names live in the clients."
+      enum: [baringo, bomet, bungoma, busia, elgeyo-marakwet, embu, garissa, homa-bay, isiolo, kajiado, kakamega, kericho, kiambu, kilifi, kirinyaga, kisii, kisumu, kitui, kwale, laikipia, lamu, machakos, makueni, mandera, marsabit, meru, migori, mombasa, muranga, nairobi, nakuru, nandi, narok, nyamira, nyandarua, nyeri, samburu, siaya, taita-taveta, tana-river, tharaka-nithi, trans-nzoia, turkana, uasin-gishu, vihiga, wajir, west-pokot]
+    SizeUnit:
+      type: string
+      description: |
+        `plots_50x100` means the size is a NUMBER of 50 by 100 ft plots (about 0.11
+        acres each), the measure most Kenyans use: a "50 by 100" is 1, a "100 by 100"
+        is 2. Stored as given, never converted.
+      enum: [acres, hectares, plots_50x100]
+    FarmInput:
+      type: object
+      required: [name, county]
+      properties:
+        name: { type: string, description: "1 to 80 characters after trimming." }
+        county: { $ref: "#/components/schemas/County" }
+        locality: { type: [string, "null"], description: "Optional village or area, up to 80 characters. Empty becomes null." }
+    FarmPatch:
+      type: object
+      properties:
+        name: { type: string }
+        county: { $ref: "#/components/schemas/County" }
+        locality: { type: [string, "null"] }
+    Farm:
+      type: object
+      required: [id, name, county, locality, plotCount, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        county: { $ref: "#/components/schemas/County" }
+        locality: { type: [string, "null"] }
+        plotCount: { type: integer, description: Number of plots on this farm. }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FarmDetail:
+      allOf:
+        - $ref: "#/components/schemas/Farm"
+        - type: object
+          required: [plots]
+          properties:
+            plots:
+              type: array
+              items: { $ref: "#/components/schemas/Plot" }
+    PlotInput:
+      type: object
+      required: [name, size, sizeUnit]
+      properties:
+        name: { type: string, description: "1 to 80 characters after trimming." }
+        size: { type: number, description: "Greater than 0 and at most 1000, in sizeUnit. Up to 2 decimal places are kept." }
+        sizeUnit: { $ref: "#/components/schemas/SizeUnit" }
+        notes: { type: [string, "null"], description: "Optional soil or context notes, up to 500 characters. Empty becomes null." }
+    PlotPatch:
+      type: object
+      properties:
+        name: { type: string }
+        size: { type: number }
+        sizeUnit: { $ref: "#/components/schemas/SizeUnit" }
+        notes: { type: [string, "null"] }
+    Plot:
+      type: object
+      required: [id, farmId, name, size, sizeUnit, notes, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        farmId: { type: string, format: uuid }
+        name: { type: string }
+        size: { type: number }
+        sizeUnit: { $ref: "#/components/schemas/SizeUnit" }
+        notes: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Deleted:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+    FarmListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          required: [meta]
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Farm" }
+            meta: { $ref: "#/components/schemas/PageMeta" }
+    FarmEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/Farm" }
+    FarmDetailEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/FarmDetail" }
+    PlotEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/Plot" }
+    DeletedEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/Deleted" }
+    CropSlug:
+      type: string
+      description: |
+        A crop from the catalogue in falcon-core, as a lowercase slug, or `other` (then
+        `customCrop` names it). The catalogue starts with the grant proposal's list and
+        grows over time; clients get it from GET /api/v1/crops and translate each slug.
+      enum: [maize, sorghum, finger_millet, pearl_millet, rice, beans, green_grams, cowpeas, pigeon_peas, cassava, irish_potatoes, sweet_potatoes, bananas, other]
+    CatalogueCrop:
+      type: object
+      required: [crop, hasCalendar, healthCheck]
+      properties:
+        crop: { $ref: "#/components/schemas/CropSlug" }
+        hasCalendar: { type: boolean, description: True when this crop's growth stages come from a published reference. }
+        healthCheck: { type: boolean, description: True when crop-health checks will cover this crop (pilot - maize and beans). }
+    CycleStatus:
+      type: string
+      enum: [planned, active, harvested, abandoned]
+    CropCycleInput:
+      type: object
+      required: [crop, plantedOn]
+      properties:
+        crop: { $ref: "#/components/schemas/CropSlug" }
+        customCrop: { type: [string, "null"], description: "Required when crop is `other`, 1 to 60 characters; must be absent or null otherwise." }
+        variety: { type: [string, "null"], description: "Optional, up to 80 characters. Empty becomes null." }
+        plantedOn: { type: string, format: date, description: "Not more than 1 year before today nor more than 6 months after (Africa/Nairobi)." }
+    CropCyclePatch:
+      type: object
+      properties:
+        variety: { type: [string, "null"] }
+        plantedOn: { type: string, format: date }
+        status: { $ref: "#/components/schemas/CycleStatus" }
+    CropCycle:
+      type: object
+      required: [id, plotId, farmId, plotName, farmName, crop, customCrop, variety, plantedOn, status, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        plotId: { type: string, format: uuid }
+        farmId: { type: string, format: uuid }
+        plotName: { type: string }
+        farmName: { type: string }
+        crop: { $ref: "#/components/schemas/CropSlug" }
+        customCrop: { type: [string, "null"] }
+        variety: { type: [string, "null"] }
+        plantedOn: { type: string, format: date }
+        status: { $ref: "#/components/schemas/CycleStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CalendarStage:
+      type: object
+      required: [key, startDay, endDay, startsOn, endsOn]
+      properties:
+        key: { type: string, description: "Stage key, e.g. emergence, vegetative, flowering, grain_fill, maturity. Clients translate it." }
+        startDay: { type: integer, description: Days after planting, from the source. }
+        endDay: { type: integer }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+    CalendarTask:
+      type: object
+      required: [key, startDay, endDay, startsOn, endsOn]
+      properties:
+        key: { type: string, description: "Task key, e.g. first_weeding, top_dressing, harvest. Never a chemical dose." }
+        startDay: { type: integer }
+        endDay: { type: integer }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+    CropCalendar:
+      type: object
+      required: [stages, tasks, currentStage, source, reviewed]
+      properties:
+        stages:
+          type: array
+          items: { $ref: "#/components/schemas/CalendarStage" }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/CalendarTask" }
+        currentStage: { type: [string, "null"], description: "Key of today's stage; null before planting or after the last stage." }
+        source: { type: string, description: Short citation of where the timings come from. }
+        reviewed: { type: boolean, description: False until an agricultural professional has checked the timings. }
+    CropCycleDetail:
+      allOf:
+        - $ref: "#/components/schemas/CropCycle"
+        - type: object
+          required: [seasonCostKes, activityCount, calendar]
+          properties:
+            seasonCostKes: { type: integer, description: Sum of this cycle's activity costs, whole KES. }
+            activityCount: { type: integer }
+            calendar:
+              oneOf:
+                - $ref: "#/components/schemas/CropCalendar"
+                - type: "null"
+    ActivityKind:
+      type: string
+      enum: [land_preparation, planting, weeding, fertiliser, pest_disease_control, irrigation, harvest, other]
+    QuantityUnit:
+      type: string
+      enum: [kg, g, litres, ml, bags, pieces, person_days]
+    ActivityInput:
+      type: object
+      required: [kind, doneOn]
+      properties:
+        kind: { $ref: "#/components/schemas/ActivityKind" }
+        doneOn: { type: string, format: date }
+        input: { type: [string, "null"], description: "What was used, e.g. DAP or certified seed. Up to 80 characters." }
+        quantity: { type: [number, "null"], description: "Greater than 0 and at most 100000, 2 decimals. Requires quantityUnit." }
+        quantityUnit:
+          oneOf:
+            - $ref: "#/components/schemas/QuantityUnit"
+            - type: "null"
+        costKes: { type: [integer, "null"], description: "Whole shillings, 0 to 10000000." }
+        notes: { type: [string, "null"], description: "Up to 500 characters." }
+    ActivityPatch:
+      type: object
+      properties:
+        kind: { $ref: "#/components/schemas/ActivityKind" }
+        doneOn: { type: string, format: date }
+        input: { type: [string, "null"] }
+        quantity: { type: [number, "null"] }
+        quantityUnit:
+          oneOf:
+            - $ref: "#/components/schemas/QuantityUnit"
+            - type: "null"
+        costKes: { type: [integer, "null"] }
+        notes: { type: [string, "null"] }
+    Activity:
+      type: object
+      required: [id, cycleId, kind, doneOn, input, quantity, quantityUnit, costKes, notes, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        cycleId: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/ActivityKind" }
+        doneOn: { type: string, format: date }
+        input: { type: [string, "null"] }
+        quantity: { type: [number, "null"] }
+        quantityUnit:
+          oneOf:
+            - $ref: "#/components/schemas/QuantityUnit"
+            - type: "null"
+        costKes: { type: [integer, "null"] }
+        notes: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ActivityPageMeta:
+      allOf:
+        - $ref: "#/components/schemas/PageMeta"
+        - type: object
+          required: [totalCostKes]
+          properties:
+            totalCostKes: { type: integer, description: Season total of all this cycle's activities, not just this page. }
+    CropListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/CatalogueCrop" }
+    CropCycleListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          required: [meta]
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/CropCycle" }
+            meta: { $ref: "#/components/schemas/PageMeta" }
+    CropCycleArrayEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/CropCycle" }
+    CropCycleEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/CropCycle" }
+    CropCycleDetailEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/CropCycleDetail" }
+    ActivityListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          required: [meta]
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Activity" }
+            meta: { $ref: "#/components/schemas/ActivityPageMeta" }
+    ActivityEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/Activity" }
+    EventInput:
+      type: object
+      required: [title, date]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120, description: "Trimmed; blank is `required`." }
+        description: { type: [string, "null"], maxLength: 1000, description: "What the event is about. Trimmed; blank = null." }
+        date: { type: string, format: date, description: "Kenya date, today or later and no more than 1 year ahead (Matt - no events on past dates). On PATCH the same rule applies when date is sent." }
+        time: { type: [string, "null"], pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "Optional HH:MM, Kenya time (EAT, UTC+3)." }
+        cycleId: { type: [string, "null"], format: uuid, description: "Optional: the crop this event is about. Must be mine (else 404)." }
+        notes: { type: [string, "null"], maxLength: 500 }
+    EventPatch:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: [string, "null"], maxLength: 1000 }
+        date: { type: string, format: date }
+        time: { type: [string, "null"], pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        cycleId: { type: [string, "null"], format: uuid }
+        notes: { type: [string, "null"], maxLength: 500 }
+    Event:
+      type: object
+      required: [id, title, description, date, time, cycleId, crop, customCrop, plotName, notes, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: [string, "null"] }
+        date: { type: string, format: date }
+        time: { type: [string, "null"], description: "HH:MM, Kenya time." }
+        cycleId: { type: [string, "null"], format: uuid }
+        crop:
+          oneOf:
+            - $ref: "#/components/schemas/CropSlug"
+            - type: "null"
+        customCrop: { type: [string, "null"] }
+        plotName: { type: [string, "null"] }
+        notes: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EventEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/Event" }
+    FarmCalendarEntry:
+      type: object
+      required: [kind, key, startsOn, endsOn, cycleId, crop, customCrop, plotName, farmName, activityId, costKes, eventId, title, time, reviewed]
+      properties:
+        kind:
+          type: string
+          enum: [stage, task, activity, event]
+          description: "`stage` and `task` come from the crop's sourced table; `activity` is something the farmer logged (startsOn = endsOn = doneOn); `event` is something the farmer put on the calendar themselves (startsOn = endsOn = its date)."
+        key: { type: string, description: "Stage key, task key, the ActivityKind for logged activities, or `event`. Clients translate it." }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+        cycleId: { type: [string, "null"], format: uuid, description: "Null only for an event not linked to a crop." }
+        crop:
+          oneOf:
+            - $ref: "#/components/schemas/CropSlug"
+            - type: "null"
+        customCrop: { type: [string, "null"] }
+        plotName: { type: [string, "null"], description: "Null only for an event not linked to a crop." }
+        farmName: { type: [string, "null"], description: "Null only for an event not linked to a crop." }
+        eventId: { type: [string, "null"], format: uuid, description: Set only for kind event. }
+        title: { type: [string, "null"], description: "The farmer's own words; set only for kind event." }
+        time: { type: [string, "null"], pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "HH:MM in Kenya time (EAT, UTC+3); set only for an event that has a time." }
+        activityId: { type: [string, "null"], format: uuid, description: Set only for kind activity. }
+        costKes: { type: [integer, "null"], description: Set only for kind activity. }
+        reviewed: { type: boolean, description: "For stage and task - false until an agricultural professional has checked the timings. Always true for activity." }
+    FarmCalendar:
+      type: object
+      required: [from, to, today, timeZone, entries, cropsWithoutCalendar]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        today: { type: string, format: date, description: Kenya date the server used. }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/FarmCalendarEntry" }
+        cropsWithoutCalendar:
+          type: integer
+          description: How many of my open crops have no sourced table, so the client can say they are not shown.
+        timeZone:
+          type: string
+          enum: [Africa/Nairobi]
+          description: "All dates and times on the calendar are Kenya time (EAT, UTC+3, no daylight saving)."
+    FarmCalendarEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/FarmCalendar" }
+    HealthReport:
+      type: object
+      required: [status, database]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        database: { type: string, enum: [ok, down] }
+    HealthEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthReport"
+    Role:
+      type: string
+      enum: [admin, member]
+      description: "From Clerk public_metadata.role; member unless exactly \"admin\"."
+    Me:
+      type: object
+      required: [userId, role]
+      properties:
+        userId: { type: string, description: Clerk user id (the token's sub). }
+        role: { $ref: "#/components/schemas/Role" }
+    MeEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Me"
+    AdminPing:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, const: true }
+    AdminPingEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AdminPing"
